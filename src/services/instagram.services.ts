@@ -2,7 +2,8 @@ import axios from "axios";
 import { ObjectId } from "mongodb";
 import { db } from "../database";
 
-//const cookie = ' mid=YO4HwQAEAAFTaPMRH_yVZl9onelD; ig_did=A71F5E06-F150-4E1B-8D1F-664EB8C45587; ig_nrcb=1; csrftoken=QWyJPve9XiOiW3hYdGZKZde8ab0sycAu; ds_user_id=2286335288; sessionid=2286335288%3A7KkYX7W5t4X8Vw%3A14; fbm_124024574287414=base_domain=.instagram.com; shbid="4478\\0542286335288\\0541677953386:01f79e7510d423d18257cc75137f49c51caeb8aae4da828a90ebaf461d1d4482b4336634"; shbts="1646417386\\0542286335288\\0541677953386:01f7a21470e9882365f84f3aa1ece538498d01e8df533ae115abdd2bfd403a724058b9ea"; fbsr_124024574287414=_A2hbs1jlaelWbAFS8qnTrEQ4Zo37NqVeAsps71Nr6Q.eyJ1c2VyX2lkIjoiMTAwMDAxMjMxMjkzNTI0IiwiY29kZSI6IkFRQm1WWVk4RGZCTFJHa1VpTDJKT3JjVy1YLXFKZVZWTkxrbGhzdDg1VHBqa0NzTFlHbFNiOXRaTlVfdnl6NEY1dEo3aVo4b3pqR1VSXy1iY0FyMFhoZzZxRnplT0NHemhMX0ZaQXEyMndwcllnZGtJRVp2VjZTZ0l5RXpKZHBhVTZrX09kSGF3OXVWZ3haa1Z0WGdYVnpuZHNWM1dMLU1GLXhSWlhodHpBQzQwd1JuM3ItWHY1N2ZFM3BUNVBQeG4wdkpMOU1GajFGU2N6aEVGeVpHQUg5TEtzOWVPWFhUR2xhNkdscm1haFVZc1hmcUVaMzhVZmk2WjVGaVpkNklNZ1VDbGdkZ0dLLTVYVHh3R2cxekphTG5Jc3dvRHlCZVpxWDkycVc2bFVuTGJfYXlja3B5RzhpdnZRQ3ZFUG40aGhJMVBXbExTN0NWQ3VHdDJDSUQ1Vnk0dWl1U2pUNnMtSlltQzhmRllqRjZTZyIsIm9hdXRoX3Rva2VuIjoiRUFBQnd6TGl4bmpZQkFLVUVRWkFMOVdES3FEWkNaQUlWd0J0dVhLOTFuUGtiZHhDOVUwcTRyUTVkTXlYVWVaQXhUazNaQlFzNFZ4OWJYRHkxUzRrQXRyZVpCQXlwa0dicktaQUoyMnZtNXFaQ1ZOYVJpek51Um9kN0ZVSnBNU2l3dm1ibVJIQTRuVHdGcWZiSEt0QWh3NHFjZ1VkWXZlSHZJNVFBSFc1VzRiSjU4RDEzc2ROVnh1a0NSMTJZMWhiVDdaQjBaRCIsImFsZ29yaXRobSI6IkhNQUMtU0hBMjU2IiwiaXNzdWVkX2F0IjoxNjQ2NDUyNzEwfQ; rur="NCG\\0542286335288\\0541678023787:01f775ccef780ca6dcf74d76dbd40fd90d01fbf20fe0ab651613e47dbe59ca06da61337a" '
+// Bibliografy:
+// https://stackoverflow.com/questions/32407851/instagram-api-how-can-i-retrieve-the-list-of-people-a-user-is-following-on-ins
 
 const cookie = String(process.env.INSTA_API_COOKIE);
 
@@ -61,7 +62,7 @@ const makeNextRequest = async (nextCurser: string, listConfig: any, userId: any,
     }
 }
 
-const getList = async (type: number, username: string) => {
+const getList = async (type: number, instaId: string) => {
     const config = {
         followers: {
             hash: 'c76146de99bb02f6415203be841dd25a',
@@ -72,19 +73,20 @@ const getList = async (type: number, username: string) => {
             path: 'edge_follow'
         }
     };
-    const userId = await getInstaId(username);
+    
     if (type === 1) {
         console.log('following');
-        return await makeNextRequest("", config.following, userId, []);
+        return await makeNextRequest("", config.following, instaId, []);
     } else if (type === 2) {
         console.log('followers');
-        return await makeNextRequest("", config.followers, userId, []);
+        return await makeNextRequest("", config.followers, instaId, []);
     }
 }
 
 export const comapareMutuals = async (username: string) => {
-    const followers = await getList(2, username);
-    const following = await getList(1, username);
+    const instaId = await getInstaId(username);
+    const followers = await getList(2, instaId);
+    const following = await getList(1, instaId);
 
     try {
         if(followers) await saveList(username, followers, "followers");
@@ -93,17 +95,19 @@ export const comapareMutuals = async (username: string) => {
         console.log(err);
     }
 
-    const notMutualFollowers = following?.filter( (u: string) => !followers?.includes(u) );
-    console.log("notMutualFollowers: " + notMutualFollowers?.length)
+    const user = await db().collection("user").findOne({ username });
 
-    const notFollowingBack = followers?.filter( (u: string) => !following?.includes(u) );
-    console.log("notFollowingBack: " + notFollowingBack?.length)
+    const notFollowYou = following?.filter( (u: string) => !followers?.includes(u) );
+    console.log("notFollowYou: " + notFollowYou?.length)
 
-    return { notMutualFollowers, notFollowingBack }
+    const youNotFollow = followers?.filter( (u: string) => !following?.includes(u) );
+    console.log("youNotFollow: " + youNotFollow?.length)
+
+    const notMutuals = { notFollowYou, youNotFollow };
+    await db().collection("notMutuals").updateOne({ userId: user?._id }, { $set: notMutuals }, { upsert: true });
+
+    return notMutuals
 }
-
-// Bibliografy:
-// https://stackoverflow.com/questions/32407851/instagram-api-how-can-i-retrieve-the-list-of-people-a-user-is-following-on-ins
 
 const getDiff = (previousList: string[], actualList: string[]) => {
     const oldItems = previousList.filter( u => !actualList.includes(u));
@@ -143,4 +147,9 @@ const saveList = async (username: string, list: string[], listType: "followers" 
         console.log("User not found");
         throw new Error("User not found");
     }
+}
+
+export const getNotMutuals = async (username: string) => {
+    const user = await db().collection("user").findOne({ username });
+    return db().collection("notMutuals").findOne({ userId: user?._id })
 }
