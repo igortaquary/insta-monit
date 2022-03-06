@@ -11,7 +11,9 @@ interface User {
     updatedAt?: Date,
 }
 
-export const createUser = (user: User) => {
+export const createUser = async (user: User) => {
+    const find = await db().collection("user").findOne({ username: user.username });
+    if(find) throw new Error("Already exists a user with this username");
     return db().collection("user").insertOne(user);
 }
 

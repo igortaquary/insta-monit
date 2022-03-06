@@ -15,7 +15,7 @@ export const createUser = async (req: Request, res: Response, next: NextFunction
         const created = await userService.createUser(newUser)
         res.json(created);
     } catch (error) {
-        next
+        next(error);
     }
 }
 
@@ -27,6 +27,6 @@ export const getUser = async (req: Request, res: Response, next: NextFunction) =
         res.json(find);
     } catch (error) {
         console.log(error);
-        next();
+        next(error);
     }
 }

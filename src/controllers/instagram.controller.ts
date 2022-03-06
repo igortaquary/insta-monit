@@ -8,6 +8,6 @@ export const listNoMutuals = async (req: Request, res: Response, next: NextFunct
         const data = await comapareMutuals(username);
         res.json(data);
     } catch (error) {
-        next()
+        next(error);
     }
 }
